@@ -649,7 +649,9 @@ bool BoardInterface::serializeParamsToJson(File file, bool inclApiKey)
   {
     if (liveData->params.cellVoltage[i] == -1)
       continue;
-    jsonData[String("c" + String(i) + "V")] = liveData->params.cellVoltage[i];
+    char key[8] = {0};
+    snprintf(key, sizeof(key), "c%dV", i);
+    jsonData[key] = liveData->params.cellVoltage[i];
   }
 
   serializeJson(jsonData, Serial);
