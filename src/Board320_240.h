@@ -58,6 +58,9 @@ protected:
   float forwardDriveOdoKmStart = -1;
   float forwardDriveOdoKmLast = -1;
   uint32_t mainLoopStart = 0;
+  uint32_t lastTimeUpdateMs = 0;
+  time_t cachedNowEpoch = 0;
+  struct tm cachedNow = {};
   float displayFps = 0;
 
 public:

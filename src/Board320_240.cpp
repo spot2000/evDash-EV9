@@ -3755,9 +3755,18 @@ void Board320_240::mainLoop()
   // syslog->println("Time taken by function: GPS loop " + String(duration4) + " microseconds");
 
   // currentTime
-  struct tm now;
-  getLocalTime(&now);
-  liveData->params.currentTime = mktime(&now);
+  struct tm now = cachedNow;
+  const uint32_t nowMs = millis();
+  if (lastTimeUpdateMs == 0 || (nowMs - lastTimeUpdateMs) >= 1000)
+  {
+    if (getLocalTime(&now))
+    {
+      cachedNow = now;
+      cachedNowEpoch = mktime(&cachedNow);
+      liveData->params.currentTime = cachedNowEpoch;
+      lastTimeUpdateMs = nowMs;
+    }
+  }
 
   // Check and eventually reconnect WIFI aconnection
   if (!liveData->params.stopCommandQueue && liveData->settings.commType != COMM_TYPE_OBD2_WIFI && !liveData->params.wifiApMode && liveData->settings.wifiEnabled == 1 &&
@@ -3783,6 +3792,10 @@ void Board320_240::mainLoop()
     }
     if (liveData->params.currTimeSyncWithGps && strlen(liveData->params.sdcardFilename) < 15)
     {
+      if (cachedNowEpoch == 0)
+      {
+        getLocalTime(&now);
+      }
       strftime(liveData->params.sdcardFilename, sizeof(liveData->params.sdcardFilename), "/%y%m%d%H%M.json", &now);
       syslog->print("Log filename by GPS: ");
       syslog->println(liveData->params.sdcardFilename);
