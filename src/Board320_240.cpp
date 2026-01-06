@@ -4270,6 +4270,14 @@ void Board320_240::syncGPS()
   {
     liveData->params.speedKmhGPS = -1;
   }
+  if (gps.course.isValid() && liveData->params.gpsSat >= 4)
+  {
+    liveData->params.gpsHeadingDeg = gps.course.deg();
+  }
+  else
+  {
+    liveData->params.gpsHeadingDeg = -1;
+  }
   if (gps.satellites.isValid())
   {
     liveData->params.gpsSat = gps.satellites.value();
@@ -4487,6 +4495,8 @@ bool Board320_240::netSendData(bool sendAbrp)
       jsonData["gpsLon"] = liveData->params.gpsLon;
       jsonData["gpsAlt"] = liveData->params.gpsAlt;
       jsonData["gpsSpeed"] = liveData->params.speedKmhGPS;
+      if (liveData->params.gpsHeadingDeg >= 0)
+        jsonData["gpsHeading"] = liveData->params.gpsHeadingDeg;
     }
 
     char payload[768];
@@ -4571,6 +4581,13 @@ bool Board320_240::netSendData(bool sendAbrp)
             strcpy(topic + strlen(liveData->settings.mqttPubTopic), "/gpsAlt");
             dtostrf(liveData->params.gpsAlt, 1, 2, tmpVal);
             client.publish(topic, tmpVal);
+
+            if (liveData->params.gpsHeadingDeg >= 0)
+            {
+              strcpy(topic + strlen(liveData->settings.mqttPubTopic), "/gpsHeading");
+              dtostrf(liveData->params.gpsHeadingDeg, 1, 2, tmpVal);
+              client.publish(topic, tmpVal);
+            }
           }
           rc = 200;
         }
@@ -4633,6 +4650,8 @@ bool Board320_240::netSendData(bool sendAbrp)
       jsonData["lat"] = liveData->params.gpsLat;
       jsonData["lon"] = liveData->params.gpsLon;
       jsonData["elevation"] = liveData->params.gpsAlt;
+      if (liveData->params.gpsHeadingDeg >= 0)
+        jsonData["heading"] = liveData->params.gpsHeadingDeg;
     }
 
     jsonData["capacity"] = liveData->params.batteryTotalAvailableKWh;
