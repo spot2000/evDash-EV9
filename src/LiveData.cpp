@@ -50,6 +50,7 @@ void LiveData::initParams()
   params.gpsLon = -1.0;
   params.gpsSat = 0;
   params.gpsAlt = -500;
+  params.gpsHeadingDeg = -1.0;
   params.setGpsTimeFromCar = 0;
   params.gyroSensorMotion = false;
   // Display
