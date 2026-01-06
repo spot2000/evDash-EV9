@@ -4427,6 +4427,7 @@ bool Board320_240::netSendData(bool sendAbrp)
 {
   int64_t startTime2 = esp_timer_get_time();
   uint16_t rc = 0;
+  const bool netDebug = liveData->settings.debugLevel >= DEBUG_GSM;
 
   if (liveData->params.socPerc < 0)
   {
@@ -4491,11 +4492,18 @@ bool Board320_240::netSendData(bool sendAbrp)
     char payload[768];
     serializeJson(jsonData, payload);
 
-    syslog->print("Sending payload: ");
-    syslog->println(payload);
+    if (netDebug)
+    {
+      syslog->print("Sending payload: ");
+      syslog->println(payload);
 
-    syslog->print("Remote API server: ");
-    syslog->println(liveData->settings.remoteApiUrl);
+      syslog->print("Remote API server: ");
+      syslog->println(liveData->settings.remoteApiUrl);
+    }
+    else
+    {
+      syslog->println("Sending data to remote API");
+    }
 
     // WIFI remote upload
     rc = 0;
@@ -4691,8 +4699,15 @@ bool Board320_240::netSendData(bool sendAbrp)
     char dta[tmpStr.length() + 1];
     tmpStr.toCharArray(dta, tmpStr.length() + 1);
 
-    syslog->print("Sending data: ");
-    syslog->println(dta); // dta is total string sent to ABRP API including api-key and user-token (could be sensitive data to log)
+    if (netDebug)
+    {
+      syslog->print("Sending data: ");
+      syslog->println(dta); // dta is total string sent to ABRP API including api-key and user-token (could be sensitive data to log)
+    }
+    else
+    {
+      syslog->println("Sending data to ABRP");
+    }
 
     // Code for sending https data to ABRP api server
     rc = 0;
@@ -4713,8 +4728,11 @@ bool Board320_240::netSendData(bool sendAbrp)
       if (rc == HTTP_CODE_OK)
       {
         // Request successful
-        String payload = http.getString();
-        syslog->println("HTTP Response: " + payload);
+        if (netDebug)
+        {
+          String payload = http.getString();
+          syslog->println("HTTP Response: " + payload);
+        }
       }
       else
       {
