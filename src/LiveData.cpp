@@ -26,7 +26,8 @@ void LiveData::initParams()
   params.stopCommandQueue = false;
   // Network
   params.ntpTimeSet = false;
-  params.lastDataSent = 0;
+  params.lastRemoteApiSent = 0;
+  params.lastAbrpSent = 0;
   params.lastContributeSent = 0;
   params.sim800l_enabled = false; // UNSUPPORTED MODULE
   params.sim800l_lastOkReceiveTime = 0; // UNSUPPORTED MODULE

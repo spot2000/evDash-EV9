@@ -106,7 +106,8 @@ typedef struct
   bool ntpTimeSet;
   uint8_t contributeStatus; // 0 - none, 1 - ready to scan (waiting for loop begin), 2 - collecting data, 3 - ready to send
   // Network
-  time_t lastDataSent;
+  time_t lastRemoteApiSent;
+  time_t lastAbrpSent;
   time_t lastContributeSent;
   bool sim800l_enabled; // UNSUPPORTED MODULE
   time_t sim800l_lastOkReceiveTime; // UNSUPPORTED MODULE

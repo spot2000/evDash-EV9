@@ -4058,8 +4058,11 @@ void Board320_240::syncTimes(time_t newTime)
   if (liveData->params.chargingStartTime != 0)
     liveData->params.chargingStartTime = newTime - (liveData->params.currentTime - liveData->params.chargingStartTime);
 
-  if (liveData->params.lastDataSent != 0)
-    liveData->params.lastDataSent = newTime - (liveData->params.currentTime - liveData->params.lastDataSent);
+  if (liveData->params.lastRemoteApiSent != 0)
+    liveData->params.lastRemoteApiSent = newTime - (liveData->params.currentTime - liveData->params.lastRemoteApiSent);
+
+  if (liveData->params.lastAbrpSent != 0)
+    liveData->params.lastAbrpSent = newTime - (liveData->params.currentTime - liveData->params.lastAbrpSent);
 
   if (liveData->params.lastContributeSent != 0)
     liveData->params.lastContributeSent = newTime - (liveData->params.currentTime - liveData->params.lastContributeSent);
@@ -4323,17 +4326,19 @@ void Board320_240::netLoop()
   }
 
   // Upload to custom API
-  if (liveData->params.currentTime - liveData->params.lastDataSent > liveData->settings.remoteUploadIntervalSec && liveData->settings.remoteUploadIntervalSec != 0)
+  if (liveData->params.currentTime - liveData->params.lastRemoteApiSent > liveData->settings.remoteUploadIntervalSec && liveData->settings.remoteUploadIntervalSec != 0)
   {
-    liveData->params.lastDataSent = liveData->params.currentTime;
-    netSendData();
+    liveData->params.lastRemoteApiSent = liveData->params.currentTime;
+    syslog->info(DEBUG_COMM, "Remote send tick");
+    netSendData(false);
   }
 
   // Upload to ABRP
-  if (liveData->params.currentTime - liveData->params.lastDataSent > liveData->settings.remoteUploadAbrpIntervalSec && liveData->settings.remoteUploadAbrpIntervalSec != 0)
+  if (liveData->params.currentTime - liveData->params.lastAbrpSent > liveData->settings.remoteUploadAbrpIntervalSec && liveData->settings.remoteUploadAbrpIntervalSec != 0)
   {
-    liveData->params.lastDataSent = liveData->params.currentTime;
-    netSendData();
+    liveData->params.lastAbrpSent = liveData->params.currentTime;
+    syslog->info(DEBUG_COMM, "ABRP send tick");
+    netSendData(true);
   }
 
   // Contribute anonymous data
@@ -4351,7 +4356,7 @@ void Board320_240::netLoop()
 /**
  * Send data
  **/
-bool Board320_240::netSendData()
+bool Board320_240::netSendData(bool sendAbrp)
 {
   int64_t startTime2 = esp_timer_get_time();
   uint16_t rc = 0;
@@ -4378,7 +4383,7 @@ bool Board320_240::netSendData()
 
   syslog->println("Start HTTP POST...");
 
-  if (liveData->settings.remoteUploadIntervalSec != 0)
+  if (!sendAbrp && liveData->settings.remoteUploadIntervalSec != 0)
   {
     StaticJsonDocument<768> jsonData;
 
@@ -4520,7 +4525,7 @@ bool Board320_240::netSendData()
       syslog->println(rc);
     }
   }
-  else if (liveData->settings.remoteUploadAbrpIntervalSec != 0)
+  else if (sendAbrp && liveData->settings.remoteUploadAbrpIntervalSec != 0)
   {
     StaticJsonDocument<768> jsonData;
 
