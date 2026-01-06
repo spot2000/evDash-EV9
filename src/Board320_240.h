@@ -96,7 +96,7 @@ public:
   // Notwork
   bool wifiSetup();
   void netLoop();
-  bool netSendData();
+  bool netSendData(bool sendAbrp);
   bool netContributeData();
   void wifiFallback();
   void wifiSwitchToMain();
