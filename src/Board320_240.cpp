@@ -62,6 +62,14 @@ RTC_DATA_ATTR unsigned int sleepCount = 0;
 WebInterface *webInterface = nullptr;
 #endif // BOARD_M5STACK_CORE2 || BOARD_M5STACK_CORES3
 
+namespace
+{
+struct NetSendJob
+{
+  bool sendAbrp;
+};
+} // namespace
+
 #ifdef BOARD_M5STACK_CORES3
 // SD card
 #define TFCARD_CS_PIN 4
@@ -259,6 +267,20 @@ void Board320_240::afterSetup()
   else
   {
     syslog->println("COMM without threading (ble/can)");
+  }
+
+  if (netSendQueue == nullptr)
+  {
+    netSendQueue = xQueueCreate(2, sizeof(NetSendJob));
+    if (netSendQueue != nullptr)
+    {
+      syslog->println("xTaskCreate/xTaskNetSendLoop - NET send via thread");
+      xTaskCreate(xTaskNetSendLoop, "xTaskNetSendLoop", 16384, (void *)this, 1, &netSendTaskHandle);
+    }
+    else
+    {
+      syslog->println("Failed to create net send queue");
+    }
   }
 
   showTime();
@@ -3569,6 +3591,33 @@ void Board320_240::xTaskCommLoop(void *pvParameters)
 }
 
 /**
+ * Task that performs network sends outside the UI loop.
+ *
+ * @param pvParameters Pointer to the Board320_240 instance.
+ */
+void Board320_240::xTaskNetSendLoop(void *pvParameters)
+{
+  Board320_240 *boardObj = (Board320_240 *)pvParameters;
+  NetSendJob job{};
+  while (1)
+  {
+    if (boardObj->netSendQueue != nullptr && xQueueReceive(boardObj->netSendQueue, &job, portMAX_DELAY) == pdTRUE)
+    {
+      boardObj->netSendInProgress = true;
+      boardObj->maxMainLoopDuringNetSendMs = 0;
+      int64_t startTime = esp_timer_get_time();
+      boardObj->netSendData(job.sendAbrp);
+      int64_t endTime = esp_timer_get_time();
+      boardObj->lastNetSendDurationMs = static_cast<uint32_t>((endTime - startTime) / 1000);
+      boardObj->netSendInProgress = false;
+      syslog->info(DEBUG_COMM, "Net send done");
+      syslog->info(DEBUG_COMM, "Net send duration (ms): " + String(boardObj->lastNetSendDurationMs));
+      syslog->info(DEBUG_COMM, "Max mainLoop during send (ms): " + String(boardObj->maxMainLoopDuringNetSendMs));
+    }
+  }
+}
+
+/**
  * commLoop function - This function runs the main communication loop.
  * It calls the commInterface's mainLoop() method to read data from
  * BLE and CAN interfaces. This allows the communication code to run
@@ -3612,9 +3661,13 @@ void Board320_240::boardLoop()
 void Board320_240::mainLoop()
 {
   // Calculate FPS
-  float timeDiff = (millis() - mainLoopStart);
-  displayFps = (timeDiff == 0 ? 0 : (1000 / (millis() - mainLoopStart)));
+  const uint32_t loopDurationMs = (millis() - mainLoopStart);
+  displayFps = (loopDurationMs == 0 ? 0 : (1000.0f / loopDurationMs));
   mainLoopStart = millis();
+  if (netSendInProgress && loopDurationMs > maxMainLoopDuringNetSendMs)
+  {
+    maxMainLoopDuringNetSendMs = loopDurationMs;
+  }
 
   // board loop
   boardLoop();
@@ -4330,7 +4383,14 @@ void Board320_240::netLoop()
   {
     liveData->params.lastRemoteApiSent = liveData->params.currentTime;
     syslog->info(DEBUG_COMM, "Remote send tick");
-    netSendData(false);
+    if (netSendQueue != nullptr)
+    {
+      NetSendJob job{false};
+      if (xQueueSend(netSendQueue, &job, 0) != pdTRUE)
+      {
+        syslog->info(DEBUG_COMM, "Net send queue full, dropping remote send");
+      }
+    }
   }
 
   // Upload to ABRP
@@ -4338,7 +4398,14 @@ void Board320_240::netLoop()
   {
     liveData->params.lastAbrpSent = liveData->params.currentTime;
     syslog->info(DEBUG_COMM, "ABRP send tick");
-    netSendData(true);
+    if (netSendQueue != nullptr)
+    {
+      NetSendJob job{true};
+      if (xQueueSend(netSendQueue, &job, 0) != pdTRUE)
+      {
+        syslog->info(DEBUG_COMM, "Net send queue full, dropping ABRP send");
+      }
+    }
   }
 
   // Contribute anonymous data
