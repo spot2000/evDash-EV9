@@ -3836,6 +3836,8 @@ void Board320_240::mainLoop()
   if (!liveData->params.stopCommandQueue && liveData->params.sdcardInit && liveData->params.sdcardRecording && liveData->params.sdcardCanNotify &&
       (liveData->params.odoKm != -1 && liveData->params.socPerc != -1))
   {
+    const size_t sdcardFlushSize = 2048;
+    const uint32_t sdcardIntervalMs = static_cast<uint32_t>(liveData->settings.sdcardLogIntervalSec) * 1000U;
     // create filename
     if (liveData->params.operationTimeSec > 0 && strlen(liveData->params.sdcardFilename) == 0)
     {
@@ -3858,22 +3860,33 @@ void Board320_240::mainLoop()
     if (strlen(liveData->params.sdcardFilename) != 0)
     {
       liveData->params.sdcardCanNotify = false;
-      File file = SD.open(liveData->params.sdcardFilename, FILE_APPEND);
-      if (!file)
+      String jsonLine;
+      serializeParamsToJson(jsonLine);
+      jsonLine += ",\n";
+      sdcardRecordBuffer += jsonLine;
+
+      const bool timeToFlush = (sdcardIntervalMs > 0U) && ((nowMs - liveData->params.sdcardLastFlushMs) >= sdcardIntervalMs);
+      const bool sizeToFlush = sdcardRecordBuffer.length() >= sdcardFlushSize;
+      if (timeToFlush || sizeToFlush)
       {
-        syslog->println("Failed to open file for appending");
-        File file = SD.open(liveData->params.sdcardFilename, FILE_WRITE);
-      }
-      if (!file)
-      {
-        syslog->println("Failed to create file");
-      }
-      if (file)
-      {
-        syslog->info(DEBUG_SDCARD, "Save buffer to SD card");
-        serializeParamsToJson(file);
-        file.print(",\n");
-        file.close();
+        File file = SD.open(liveData->params.sdcardFilename, FILE_APPEND);
+        if (!file)
+        {
+          syslog->println("Failed to open file for appending");
+          File file = SD.open(liveData->params.sdcardFilename, FILE_WRITE);
+        }
+        if (!file)
+        {
+          syslog->println("Failed to create file");
+        }
+        if (file)
+        {
+          syslog->info(DEBUG_SDCARD, "Save buffer to SD card");
+          file.print(sdcardRecordBuffer);
+          file.close();
+          sdcardRecordBuffer = "";
+          liveData->params.sdcardLastFlushMs = nowMs;
+        }
       }
     }
   }
@@ -4238,9 +4251,30 @@ void Board320_240::sdcardToggleRecording()
   if (liveData->params.sdcardRecording)
   {
     liveData->params.sdcardCanNotify = true;
+    liveData->params.sdcardLastFlushMs = millis();
   }
   else
   {
+    if (sdcardRecordBuffer.length() > 0 && strlen(liveData->params.sdcardFilename) != 0)
+    {
+      File file = SD.open(liveData->params.sdcardFilename, FILE_APPEND);
+      if (!file)
+      {
+        syslog->println("Failed to open file for appending");
+        File file = SD.open(liveData->params.sdcardFilename, FILE_WRITE);
+      }
+      if (!file)
+      {
+        syslog->println("Failed to create file");
+      }
+      if (file)
+      {
+        syslog->info(DEBUG_SDCARD, "Save buffer to SD card");
+        file.print(sdcardRecordBuffer);
+        file.close();
+      }
+      sdcardRecordBuffer = "";
+    }
     String tmpStr = "";
     tmpStr.toCharArray(liveData->params.sdcardFilename, tmpStr.length() + 1);
   }

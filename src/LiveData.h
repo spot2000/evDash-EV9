@@ -131,6 +131,7 @@ typedef struct
   bool sdcardRecording;
   char sdcardFilename[32];
   char sdcardAbrpFilename[32];
+  uint32_t sdcardLastFlushMs;
   // Display
   uint8_t displayScreen;
   uint8_t displayScreenAutoMode;
