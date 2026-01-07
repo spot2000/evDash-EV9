@@ -559,10 +559,10 @@ void BoardInterface::parseRowMerged()
 /**
  * Serialize parameters for abrp/remote upload/sdcard
  */
-bool BoardInterface::serializeParamsToJson(File file, bool inclApiKey)
+namespace
 {
-  StaticJsonDocument<4096> jsonData;
-
+void populateParamsJson(LiveData *liveData, StaticJsonDocument<4096> &jsonData, bool inclApiKey)
+{
   if (inclApiKey)
     jsonData["apiKey"] = liveData->settings.remoteApiKey;
 
@@ -654,10 +654,24 @@ bool BoardInterface::serializeParamsToJson(File file, bool inclApiKey)
     snprintf(key, sizeof(key), "c%dV", i);
     jsonData[key] = liveData->params.cellVoltage[i];
   }
+}
+} // namespace
 
+bool BoardInterface::serializeParamsToJson(File file, bool inclApiKey)
+{
+  StaticJsonDocument<4096> jsonData;
+  populateParamsJson(liveData, jsonData, inclApiKey);
   serializeJson(jsonData, Serial);
   serializeJson(jsonData, file);
+  return true;
+}
 
+bool BoardInterface::serializeParamsToJson(String &outJson, bool inclApiKey)
+{
+  StaticJsonDocument<4096> jsonData;
+  populateParamsJson(liveData, jsonData, inclApiKey);
+  outJson = "";
+  serializeJson(jsonData, outJson);
   return true;
 }
 
